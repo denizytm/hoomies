@@ -64,7 +64,18 @@ export async function getListings(filters: ListingFilters): Promise<ListingWithP
 
   const { data } = await query;
   const withPhotos = await attachPhotos(supabase, data ?? []);
-  return attachScores(supabase, withPhotos);
+  const withScores = await attachScores(supabase, withPhotos);
+
+  // Arama önceliği: yüksek puanlı ilan sahipleri önde (eşitlikte yeni ilan önde)
+  const ownerIds = [...new Set(withScores.map((l) => l.owner_id))];
+  const { data: pts } = await supabase
+    .from("profiles")
+    .select("id, points")
+    .in("id", ownerIds);
+  const ptMap = new Map((pts ?? []).map((p) => [p.id, p.points]));
+  return [...withScores].sort(
+    (a, b) => (ptMap.get(b.owner_id) ?? 0) - (ptMap.get(a.owner_id) ?? 0),
+  );
 }
 
 export async function getMyListings(ownerId: string): Promise<ListingWithPhotos[]> {

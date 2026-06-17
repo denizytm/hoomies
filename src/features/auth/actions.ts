@@ -25,7 +25,7 @@ export async function registerAction(
     return { error: parsed.error.issues[0]?.message ?? "Form geçersiz" };
   }
 
-  const { fullName, email, password, role } = parsed.data;
+  const { fullName, email, password, role, referralCode } = parsed.data;
   const supabase = await createClient();
 
   // Pre-check the edu-mail domain for a friendly message. The DB trigger enforces
@@ -50,7 +50,7 @@ export async function registerAction(
     email,
     password,
     options: {
-      data: { full_name: fullName, role },
+      data: { full_name: fullName, role, referral_code: referralCode ?? "" },
       emailRedirectTo: `${siteUrl}/auth/callback?next=/onboarding`,
     },
   });

@@ -45,6 +45,8 @@ export type Database = {
           avatar_url: string | null;
           role: UserRole | null;
           onboarding_completed: boolean;
+          points: number;
+          member_no: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -58,6 +60,8 @@ export type Database = {
           avatar_url?: string | null;
           role?: UserRole | null;
           onboarding_completed?: boolean;
+          points?: number;
+          member_no?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -214,6 +218,24 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["messages"]["Insert"]>;
         Relationships: [];
       };
+      referral_codes: {
+        Row: {
+          code: string;
+          owner_id: string;
+          used_by: string | null;
+          used_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          code: string;
+          owner_id: string;
+          used_by?: string | null;
+          used_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["referral_codes"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -242,5 +264,6 @@ export type Listing = Tables["listings"]["Row"];
 export type ListingPhoto = Tables["listing_photos"]["Row"];
 export type Conversation = Tables["conversations"]["Row"];
 export type Message = Tables["messages"]["Row"];
+export type ReferralCode = Tables["referral_codes"]["Row"];
 
 export type QuestionOption = { value: number; label: string };
