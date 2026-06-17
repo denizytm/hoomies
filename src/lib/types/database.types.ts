@@ -175,7 +175,12 @@ export type Database = {
       };
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      compatibility_scores: {
+        Args: { other_users: string[] };
+        Returns: { user_id: string; score: number }[];
+      };
+    };
     Enums: {
       user_role: UserRole;
       listing_status: ListingStatus;

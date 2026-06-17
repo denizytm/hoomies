@@ -2,7 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import type { Listing, ListingPhoto, Profile } from "@/lib/types/database.types";
 import type { ListingFilters } from "@/lib/validation/listing";
 
-export type ListingWithPhotos = Listing & { photos: ListingPhoto[] };
+export type ListingWithPhotos = Listing & {
+  photos: ListingPhoto[];
+  // Uyum yüzdesi (görüntüleyen kullanıcı ile ilan sahibi arasında). null = hesaplanamadı.
+  score: number | null;
+};
 
 async function attachPhotos(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -22,7 +26,25 @@ async function attachPhotos(
     arr.push(p);
     byListing.set(p.listing_id, arr);
   }
-  return listings.map((l) => ({ ...l, photos: byListing.get(l.id) ?? [] }));
+  return listings.map((l) => ({
+    ...l,
+    photos: byListing.get(l.id) ?? [],
+    score: null,
+  }));
+}
+
+// Görüntüleyen kullanıcı ile ilan sahipleri arasındaki uyum yüzdesini doldurur.
+async function attachScores(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  listings: ListingWithPhotos[],
+): Promise<ListingWithPhotos[]> {
+  if (listings.length === 0) return listings;
+  const ownerIds = [...new Set(listings.map((l) => l.owner_id))];
+  const { data } = await supabase.rpc("compatibility_scores", {
+    other_users: ownerIds,
+  });
+  const map = new Map((data ?? []).map((s) => [s.user_id, s.score]));
+  return listings.map((l) => ({ ...l, score: map.get(l.owner_id) ?? null }));
 }
 
 export async function getListings(filters: ListingFilters): Promise<ListingWithPhotos[]> {
@@ -41,7 +63,8 @@ export async function getListings(filters: ListingFilters): Promise<ListingWithP
   if (filters.pets) query = query.eq("pets_allowed", true);
 
   const { data } = await query;
-  return attachPhotos(supabase, data ?? []);
+  const withPhotos = await attachPhotos(supabase, data ?? []);
+  return attachScores(supabase, withPhotos);
 }
 
 export async function getMyListings(ownerId: string): Promise<ListingWithPhotos[]> {
@@ -68,7 +91,7 @@ export async function getListingById(id: string): Promise<ListingDetail | null> 
     .maybeSingle();
   if (!listing) return null;
 
-  const [withPhotos] = await attachPhotos(supabase, [listing]);
+  const [withScore] = await attachScores(supabase, await attachPhotos(supabase, [listing]));
 
   const { data: owner } = await supabase
     .from("profiles")
@@ -87,7 +110,7 @@ export async function getListingById(id: string): Promise<ListingDetail | null> 
   }
 
   return {
-    ...withPhotos,
+    ...withScore,
     owner: owner
       ? {
           id: owner.id,

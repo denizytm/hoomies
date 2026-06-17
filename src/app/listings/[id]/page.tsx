@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { CompatibilityBadge } from "@/features/listings/compatibility-badge";
 import { ContactCard } from "@/features/listings/contact-card";
 import { PhotoGallery } from "@/features/listings/photo-gallery";
 import { getListingById } from "@/features/listings/queries";
@@ -65,6 +66,9 @@ export default async function ListingDetailPage({
                   {listing.neighborhood ? `${listing.neighborhood}, ` : ""}
                   {listing.district}, {listing.city}
                 </p>
+                {listing.score != null && (
+                  <CompatibilityBadge score={listing.score} className="mt-3 px-2.5 py-1 text-sm" />
+                )}
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-primary">{formatRent(listing.monthly_rent)}</p>

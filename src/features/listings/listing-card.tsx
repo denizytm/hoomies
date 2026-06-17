@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BedDouble, ImageOff, MapPin, PawPrint, Sofa } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { CompatibilityBadge } from "@/features/listings/compatibility-badge";
 import type { ListingWithPhotos } from "@/features/listings/queries";
 import { formatRent } from "@/lib/format";
 import { LISTING_BUCKET, publicImageUrl } from "@/lib/supabase/storage";
@@ -33,6 +34,12 @@ export function ListingCard({ listing }: { listing: ListingWithPhotos }) {
           {formatRent(listing.monthly_rent)}
           <span className="font-normal text-muted-foreground">/ay</span>
         </div>
+        {listing.score != null && (
+          <CompatibilityBadge
+            score={listing.score}
+            className="absolute top-3 right-3 border-transparent bg-background/95 px-2.5 py-1 shadow-sm backdrop-blur"
+          />
+        )}
       </div>
 
       <div className="p-4">
