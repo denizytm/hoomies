@@ -4,6 +4,24 @@ import { useEffect, useRef } from "react";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
+// Merkez etrafında ~yarıçaplı çember poligonu (gizlilik için yaklaşık alan).
+function circlePolygon(
+  lng: number,
+  lat: number,
+  radiusMeters: number,
+  points = 64,
+): [number, number][] {
+  const earth = 6378137;
+  const dLat = (radiusMeters / earth) * (180 / Math.PI);
+  const dLng = dLat / Math.cos((lat * Math.PI) / 180);
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= points; i++) {
+    const theta = (i / points) * 2 * Math.PI;
+    coords.push([lng + dLng * Math.cos(theta), lat + dLat * Math.sin(theta)]);
+  }
+  return coords;
+}
+
 export function ListingMap({
   lng,
   lat,
@@ -38,10 +56,34 @@ export function ListingMap({
           layers: [{ id: "osm", type: "raster", source: "osm" }],
         },
         center: [lng, lat],
-        zoom: 12,
+        zoom: 13,
       });
       m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-      new maplibregl.Marker({ color: "#f97316" }).setLngLat([lng, lat]).addTo(m);
+      m.on("load", () => {
+        m.addSource("area", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "Polygon",
+              coordinates: [circlePolygon(lng, lat, 600)],
+            },
+          },
+        });
+        m.addLayer({
+          id: "area-fill",
+          type: "fill",
+          source: "area",
+          paint: { "fill-color": "#f97316", "fill-opacity": 0.18 },
+        });
+        m.addLayer({
+          id: "area-line",
+          type: "line",
+          source: "area",
+          paint: { "line-color": "#f97316", "line-width": 2 },
+        });
+      });
       map = m;
     })();
 

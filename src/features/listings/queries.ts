@@ -1,3 +1,4 @@
+import type { SortKey } from "@/lib/constants";
 import { isEffectivelyBanned } from "@/lib/ban";
 import { createClient } from "@/lib/supabase/server";
 import type { Listing, ListingPhoto, Profile } from "@/lib/types/database.types";
@@ -48,7 +49,13 @@ async function attachScores(
   return listings.map((l) => ({ ...l, score: map.get(l.owner_id) ?? null }));
 }
 
-export async function getListings(filters: ListingFilters): Promise<ListingWithPhotos[]> {
+const availableOf = (l: ListingWithPhotos) =>
+  Math.max((l.capacity ?? 0) - (l.occupied ?? 0), 0);
+
+export async function getListings(
+  filters: ListingFilters,
+  sort: SortKey = "recommended",
+): Promise<ListingWithPhotos[]> {
   const supabase = await createClient();
   let query = supabase
     .from("listings")
@@ -61,7 +68,6 @@ export async function getListings(filters: ListingFilters): Promise<ListingWithP
   if (filters.district) query = query.eq("district", filters.district);
   if (filters.minRent != null) query = query.gte("monthly_rent", filters.minRent);
   if (filters.maxRent != null) query = query.lte("monthly_rent", filters.maxRent);
-  if (filters.rooms != null) query = query.gte("room_count", filters.rooms);
   if (filters.pets) query = query.eq("pets_allowed", true);
 
   const { data } = await query;
@@ -79,9 +85,32 @@ export async function getListings(filters: ListingFilters): Promise<ListingWithP
     (owners ?? []).filter((p) => isEffectivelyBanned(p)).map((p) => p.id),
   );
 
-  return withScores
-    .filter((l) => !bannedSet.has(l.owner_id))
-    .sort((a, b) => (ptMap.get(b.owner_id) ?? 0) - (ptMap.get(a.owner_id) ?? 0));
+  let result = withScores.filter((l) => !bannedSet.has(l.owner_id));
+  if (filters.minAvailable != null) {
+    result = result.filter((l) => availableOf(l) >= filters.minAvailable!);
+  }
+
+  switch (sort) {
+    case "compatibility":
+      result.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+      break;
+    case "newest":
+      result.sort((a, b) => b.created_at.localeCompare(a.created_at));
+      break;
+    case "rent_asc":
+      result.sort((a, b) => a.monthly_rent - b.monthly_rent);
+      break;
+    case "rent_desc":
+      result.sort((a, b) => b.monthly_rent - a.monthly_rent);
+      break;
+    case "available":
+      result.sort((a, b) => availableOf(b) - availableOf(a));
+      break;
+    default: // recommended: yüksek puanlı sahipler önde
+      result.sort((a, b) => (ptMap.get(b.owner_id) ?? 0) - (ptMap.get(a.owner_id) ?? 0));
+      break;
+  }
+  return result;
 }
 
 export async function getMyListings(ownerId: string): Promise<ListingWithPhotos[]> {

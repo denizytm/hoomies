@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { Chat } from "@/features/messages/chat";
+import { CompatibilityBadge } from "@/features/listings/compatibility-badge";
 import { getConversation } from "@/features/messages/queries";
 import { requireOnboardedProfile } from "@/lib/auth";
 
@@ -41,6 +42,28 @@ export default async function ConversationPage({
           </Link>
         )}
       </div>
+
+      {data.otherAnswers.length > 0 && (
+        <details
+          className="group mb-4 rounded-2xl border border-border bg-card p-4"
+          open
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-medium">
+            <span>
+              {data.isHost ? "İsteyen kişinin" : "Karşı tarafın"} uyum profili
+            </span>
+            {data.otherScore != null && <CompatibilityBadge score={data.otherScore} />}
+          </summary>
+          <ul className="mt-3 space-y-2 border-t border-border pt-3">
+            {data.otherAnswers.map((a, i) => (
+              <li key={i} className="flex items-start justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">{a.question}</span>
+                <span className="shrink-0 font-medium">{a.answer}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <Chat
         conversationId={id}

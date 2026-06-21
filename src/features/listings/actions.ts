@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import type { ListingStatus } from "@/lib/types/database.types";
-import { listingFormSchema, validatePhotoCount } from "@/lib/validation/listing";
+import {
+  listingFormSchema,
+  validateCategorizedPhotos,
+} from "@/lib/validation/listing";
+
+type CategorizedPhoto = { path: string; category: string };
 
 export type ListingState = { error?: string } | null;
 
@@ -19,7 +24,7 @@ export async function createListingAction(
   _prev: ListingState,
   formData: FormData,
 ): Promise<ListingState> {
-  let photos: string[] = [];
+  let photos: CategorizedPhoto[] = [];
   try {
     photos = JSON.parse((formData.get("photos") as string) || "[]");
   } catch {
@@ -27,7 +32,7 @@ export async function createListingAction(
   }
   const features = formData.getAll("features").map(String);
 
-  const photoErr = validatePhotoCount(photos.length);
+  const photoErr = validateCategorizedPhotos(photos);
   if (photoErr) return { error: photoErr };
 
   const parsed = listingFormSchema.safeParse({
@@ -35,10 +40,12 @@ export async function createListingAction(
     description: formData.get("description") ?? "",
     monthlyRent: formData.get("monthlyRent"),
     deposit: optNum(formData.get("deposit")),
+    dues: optNum(formData.get("dues")),
     billsIncluded: formData.get("billsIncluded") === "true",
-    roomCount: formData.get("roomCount") ?? 1,
+    capacity: formData.get("capacity"),
+    occupied: formData.get("occupied") ?? 0,
     totalRooms: optNum(formData.get("totalRooms")),
-    flatmatesCount: optNum(formData.get("flatmatesCount")),
+    bathroomCount: optNum(formData.get("bathroomCount")),
     availableFrom: formData.get("availableFrom") ?? "",
     city: formData.get("city"),
     district: formData.get("district"),
@@ -64,10 +71,13 @@ export async function createListingAction(
       description: d.description || null,
       monthly_rent: d.monthlyRent,
       deposit: d.deposit ?? null,
+      dues: d.dues ?? null,
       bills_included: d.billsIncluded,
-      room_count: d.roomCount,
+      capacity: d.capacity,
+      occupied: d.occupied,
+      room_count: d.totalRooms ?? 1,
       total_rooms: d.totalRooms ?? null,
-      flatmates_count: d.flatmatesCount ?? null,
+      bathroom_count: d.bathroomCount ?? null,
       available_from: d.availableFrom || null,
       city: d.city,
       district: d.district,
@@ -84,9 +94,10 @@ export async function createListingAction(
     return { error: error?.message ?? "İlan oluşturulamadı." };
   }
 
-  const photoRows = photos.map((path, i) => ({
+  const photoRows = photos.map((p, i) => ({
     listing_id: listing.id,
-    storage_path: path,
+    storage_path: p.path,
+    category: p.category,
     position: i,
   }));
   const { error: photoError } = await supabase.from("listing_photos").insert(photoRows);
@@ -108,13 +119,14 @@ export async function extendListingAction(formData: FormData) {
   revalidatePath("/listings/mine");
 }
 
-// Eşleşme sonrası / elle ilanı kapat.
+// Eşleşme sonrası / elle ilanı kapat — sebebiyle birlikte.
 export async function closeListingAction(formData: FormData) {
   const id = formData.get("id") as string;
+  const reason = (formData.get("reason") as string) || null;
   const { supabase, user } = await requireUser();
   await supabase
     .from("listings")
-    .update({ status: "closed" })
+    .update({ status: "closed", close_reason: reason })
     .eq("id", id)
     .eq("owner_id", user.id);
   revalidatePath("/listings/mine");

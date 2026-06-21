@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Conversation, ConversationStatus, Message } from "@/lib/types/database.types";
+import type {
+  Conversation,
+  ConversationStatus,
+  Message,
+  QuestionOption,
+} from "@/lib/types/database.types";
 
 export type ConversationListItem = {
   id: string;
@@ -65,12 +70,20 @@ export async function getConversationsForUser(
   });
 }
 
+export type CompatibilityAnswerView = {
+  question: string;
+  answer: string;
+  category: string;
+};
+
 export type ConversationDetail = {
   conversation: Conversation;
   listing: { id: string; title: string; city: string; district: string; status: string } | null;
   isHost: boolean;
   other: { id: string; full_name: string | null; avatar_url: string | null } | null;
   messages: Message[];
+  otherScore: number | null;
+  otherAnswers: CompatibilityAnswerView[];
 };
 
 export async function getConversation(
@@ -107,11 +120,44 @@ export async function getConversation(
       .order("created_at", { ascending: true }),
   ]);
 
+  // Karşı tarafın uyum cevapları (RPC, sadece taraflar görebilir) + skor
+  const { data: rawAnswers } = await supabase.rpc("conversation_other_answers", {
+    conv_id: id,
+  });
+
+  let otherScore: number | null = null;
+  let otherAnswers: CompatibilityAnswerView[] = [];
+
+  if (rawAnswers && rawAnswers.length > 0) {
+    const [{ data: scores }, { data: questions }, { data: cats }] = await Promise.all([
+      supabase.rpc("compatibility_scores", { other_users: [otherId] }),
+      supabase.from("compatibility_questions").select("*").order("position"),
+      supabase.from("compatibility_categories").select("*"),
+    ]);
+    otherScore = scores?.[0]?.score ?? null;
+
+    const valueMap = new Map(rawAnswers.map((a) => [a.question_id, a.value]));
+    const catMap = new Map((cats ?? []).map((c) => [c.id, c.name]));
+    otherAnswers = (questions ?? [])
+      .filter((q) => valueMap.has(q.id))
+      .map((q) => {
+        const opts = (q.options as QuestionOption[]) ?? [];
+        const v = valueMap.get(q.id);
+        return {
+          question: q.question,
+          answer: opts.find((o) => o.value === v)?.label ?? String(v),
+          category: catMap.get(q.category_id) ?? "",
+        };
+      });
+  }
+
   return {
     conversation,
     listing: listing ?? null,
     isHost,
     other: other ?? null,
     messages: messages ?? [],
+    otherScore,
+    otherAnswers,
   };
 }

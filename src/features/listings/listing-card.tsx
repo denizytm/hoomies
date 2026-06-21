@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BedDouble, ImageOff, MapPin, PawPrint, Sofa } from "lucide-react";
+import { ImageOff, MapPin, PawPrint, Sofa } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { CapacityIcons } from "@/features/listings/capacity-icons";
 import { CompatibilityBadge } from "@/features/listings/compatibility-badge";
 import type { ListingWithPhotos } from "@/features/listings/queries";
 import { formatRent } from "@/lib/format";
@@ -48,10 +49,12 @@ export function ListingCard({ listing }: { listing: ListingWithPhotos }) {
           <MapPin className="size-3.5" />
           {listing.district}, {listing.city}
         </p>
+        <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <CapacityIcons capacity={listing.capacity} occupied={listing.occupied} />
+          <span>{Math.max(listing.capacity - listing.occupied, 0)} müsait</span>
+          {listing.total_rooms ? <span>· {listing.total_rooms} oda</span> : null}
+        </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <Badge variant="secondary">
-            <BedDouble className="size-3.5" /> {listing.room_count} oda
-          </Badge>
           {listing.furnished && (
             <Badge variant="secondary">
               <Sofa className="size-3.5" /> Eşyalı

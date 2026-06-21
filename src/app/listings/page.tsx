@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ListingCard } from "@/features/listings/listing-card";
 import { ListingFilters } from "@/features/listings/listing-filters";
 import { getListings } from "@/features/listings/queries";
+import type { SortKey } from "@/lib/constants";
 import { requireOnboardedProfile } from "@/lib/auth";
 
 export const metadata = { title: "İlanlar" };
@@ -18,14 +19,17 @@ export default async function ListingsPage({
   const profile = await requireOnboardedProfile();
   const sp = await searchParams;
 
-  const listings = await getListings({
-    city: sp.city || undefined,
-    district: sp.district || undefined,
-    minRent: sp.minRent ? Number(sp.minRent) : undefined,
-    maxRent: sp.maxRent ? Number(sp.maxRent) : undefined,
-    rooms: sp.rooms ? Number(sp.rooms) : undefined,
-    pets: sp.pets === "true" ? true : undefined,
-  });
+  const listings = await getListings(
+    {
+      city: sp.city || undefined,
+      district: sp.district || undefined,
+      minRent: sp.minRent ? Number(sp.minRent) : undefined,
+      maxRent: sp.maxRent ? Number(sp.maxRent) : undefined,
+      minAvailable: sp.minAvailable ? Number(sp.minAvailable) : undefined,
+      pets: sp.pets === "true" ? true : undefined,
+    },
+    (sp.sort as SortKey) || "recommended",
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">

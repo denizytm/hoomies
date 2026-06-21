@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { createListingAction } from "@/features/listings/actions";
-import { PhotoUploader } from "@/features/listings/photo-uploader";
+import {
+  CategorizedPhotoUploader,
+  type CategorizedPhoto,
+} from "@/features/listings/categorized-photo-uploader";
 import {
   GENDER_PREFERENCE_OPTIONS,
   LISTING_FEATURES,
-  MIN_LISTING_PHOTOS,
+  PHOTO_CATEGORIES,
 } from "@/lib/constants";
 import { CITIES, districtsFor } from "@/lib/data/locations";
 
@@ -29,7 +32,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function ListingForm({ userId }: { userId: string }) {
   const [state, formAction, pending] = useActionState(createListingAction, null);
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<CategorizedPhoto[]>([]);
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
 
@@ -37,14 +40,16 @@ export function ListingForm({ userId }: { userId: string }) {
     if (state?.error) toast.error(state.error);
   }, [state]);
 
-  const enoughPhotos = photos.length >= MIN_LISTING_PHOTOS;
+  const allCategories = PHOTO_CATEGORIES.every((c) =>
+    photos.some((p) => p.category === c.key),
+  );
 
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="photos" value={JSON.stringify(photos)} />
 
       <Section title="Fotoğraflar">
-        <PhotoUploader userId={userId} value={photos} onChange={setPhotos} />
+        <CategorizedPhotoUploader userId={userId} value={photos} onChange={setPhotos} />
       </Section>
 
       <Section title="Temel bilgiler">
@@ -54,7 +59,7 @@ export function ListingForm({ userId }: { userId: string }) {
             <Input
               id="title"
               name="title"
-              placeholder="ODTÜ'ye yürüme mesafesinde, eşyalı 2+1'de oda"
+              placeholder="ODTÜ'ye yürüme mesafesinde, 3 kişilik evde 1 oda"
               required
             />
           </div>
@@ -118,37 +123,48 @@ export function ListingForm({ userId }: { userId: string }) {
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Gizlilik için yalnızca ilçe/semt gösterilir; tam adres asla otomatik paylaşılmaz.
+          Gizlilik için yalnızca ilçe/semt ve yaklaşık bölge gösterilir; tam adres asla
+          otomatik paylaşılmaz.
         </p>
       </Section>
 
-      <Section title="Detaylar">
+      <Section title="Kapasite & oda">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-2">
+            <Label htmlFor="capacity">Toplam kişi kapasitesi</Label>
+            <Input id="capacity" name="capacity" inputMode="numeric" defaultValue="3" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="occupied">Şu an dolu kişi</Label>
+            <Input id="occupied" name="occupied" inputMode="numeric" defaultValue="0" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="totalRooms">Oda sayısı</Label>
+            <Input id="totalRooms" name="totalRooms" inputMode="numeric" placeholder="Ör. 3" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bathroomCount">Banyo / tuvalet</Label>
+            <Input id="bathroomCount" name="bathroomCount" inputMode="numeric" placeholder="Ör. 1" />
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Müsait kişi = kapasite − dolu. Kartlarda kişi ikonlarıyla gösterilir.
+        </p>
+      </Section>
+
+      <Section title="Fiyat & detaylar">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="monthlyRent">Aylık kira (₺)</Label>
             <Input id="monthlyRent" name="monthlyRent" inputMode="numeric" required />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="dues">Aidat (₺/ay, opsiyonel)</Label>
+            <Input id="dues" name="dues" inputMode="numeric" />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="deposit">Depozito (₺, opsiyonel)</Label>
             <Input id="deposit" name="deposit" inputMode="numeric" />
-          </div>
-          <div className="space-y-2">
-            <Label>Kiralık oda sayısı</Label>
-            <NativeSelect name="roomCount" defaultValue="1">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n} oda
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="totalRooms">Evdeki toplam oda (opsiyonel)</Label>
-            <Input id="totalRooms" name="totalRooms" inputMode="numeric" placeholder="Ör. 3" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="flatmatesCount">Mevcut ev arkadaşı (opsiyonel)</Label>
-            <Input id="flatmatesCount" name="flatmatesCount" inputMode="numeric" placeholder="Ör. 1" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="availableFrom">Müsait tarih (opsiyonel)</Label>
@@ -203,12 +219,12 @@ export function ListingForm({ userId }: { userId: string }) {
       </Section>
 
       <div className="flex flex-col items-end gap-2">
-        {!enoughPhotos && (
+        {!allCategories && (
           <p className="text-sm text-muted-foreground">
-            Yayınlamak için en az {MIN_LISTING_PHOTOS} fotoğraf ekle.
+            Her fotoğraf kategorisine (oda, banyo, mutfak, ortak alan) en az 1 foto ekle.
           </p>
         )}
-        <Button type="submit" size="lg" disabled={pending || !enoughPhotos}>
+        <Button type="submit" size="lg" disabled={pending || !allCategories}>
           {pending && <Loader2 className="animate-spin" />}
           İlanı yayınla
         </Button>

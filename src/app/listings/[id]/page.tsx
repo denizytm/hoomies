@@ -1,17 +1,19 @@
 import { notFound } from "next/navigation";
 import {
-  BedDouble,
+  Bath,
   CalendarDays,
   Check,
   Coins,
   Home,
   MapPin,
   PawPrint,
+  Receipt,
   Sofa,
   Users,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { CapacityIcons } from "@/features/listings/capacity-icons";
 import { CompatibilityBadge } from "@/features/listings/compatibility-badge";
 import { ContactCard } from "@/features/listings/contact-card";
 import { ListingMap } from "@/features/listings/listing-map";
@@ -43,13 +45,14 @@ export default async function ListingDetailPage({
   const features = (listing.features as string[]) ?? [];
   const coords = coordsFor(listing.city, listing.district);
 
+  const available = Math.max(listing.capacity - listing.occupied, 0);
   const facts = [
-    { icon: BedDouble, label: `${listing.room_count} kiralık oda` },
     listing.total_rooms ? { icon: Home, label: `${listing.total_rooms} odalı ev` } : null,
-    listing.flatmates_count != null
-      ? { icon: Users, label: `${listing.flatmates_count} ev arkadaşı` }
+    listing.bathroom_count != null
+      ? { icon: Bath, label: `${listing.bathroom_count} banyo/tuvalet` }
       : null,
     listing.deposit ? { icon: Coins, label: `${formatRent(listing.deposit)} depozito` } : null,
+    listing.dues ? { icon: Receipt, label: `${formatRent(listing.dues)} aidat/ay` } : null,
     listing.available_from
       ? { icon: CalendarDays, label: `${formatDate(listing.available_from)} müsait` }
       : null,
@@ -73,12 +76,23 @@ export default async function ListingDetailPage({
                 {listing.score != null && (
                   <CompatibilityBadge score={listing.score} className="mt-3 px-2.5 py-1 text-sm" />
                 )}
+                <div className="mt-3 flex items-center gap-2 text-sm">
+                  <CapacityIcons capacity={listing.capacity} occupied={listing.occupied} />
+                  <span className="text-muted-foreground">
+                    {available} müsait / {listing.capacity} kişilik
+                  </span>
+                </div>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-primary">{formatRent(listing.monthly_rent)}</p>
                 <p className="text-sm text-muted-foreground">
                   / ay {listing.bills_included && "· faturalar dahil"}
                 </p>
+                {listing.dues ? (
+                  <p className="text-xs text-muted-foreground">
+                    + {formatRent(listing.dues)} aidat
+                  </p>
+                ) : null}
               </div>
             </div>
 

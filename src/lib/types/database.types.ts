@@ -122,10 +122,15 @@ export type Database = {
           description: string | null;
           monthly_rent: number;
           deposit: number | null;
+          dues: number | null;
           bills_included: boolean;
           room_count: number;
           total_rooms: number | null;
           flatmates_count: number | null;
+          capacity: number;
+          occupied: number;
+          bathroom_count: number | null;
+          close_reason: string | null;
           available_from: string | null;
           city: string;
           district: string;
@@ -146,10 +151,15 @@ export type Database = {
           description?: string | null;
           monthly_rent: number;
           deposit?: number | null;
+          dues?: number | null;
           bills_included?: boolean;
           room_count?: number;
           total_rooms?: number | null;
           flatmates_count?: number | null;
+          capacity?: number;
+          occupied?: number;
+          bathroom_count?: number | null;
+          close_reason?: string | null;
           available_from?: string | null;
           city: string;
           district: string;
@@ -172,6 +182,7 @@ export type Database = {
           listing_id: string;
           storage_path: string;
           position: number;
+          category: string | null;
           created_at: string;
         };
         Insert: {
@@ -179,6 +190,7 @@ export type Database = {
           listing_id: string;
           storage_path: string;
           position?: number;
+          category?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["listing_photos"]["Insert"]>;
@@ -284,6 +296,10 @@ export type Database = {
       unban_user: {
         Args: { target: string };
         Returns: undefined;
+      };
+      conversation_other_answers: {
+        Args: { conv_id: string };
+        Returns: { question_id: number; value: number }[];
       };
     };
     Enums: {

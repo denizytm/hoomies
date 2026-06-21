@@ -1,14 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { AlarmClock, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { extendListingAction, setListingStatusAction } from "@/features/listings/actions";
+import { NativeSelect } from "@/components/ui/native-select";
+import {
+  closeListingAction,
+  extendListingAction,
+  setListingStatusAction,
+} from "@/features/listings/actions";
 import { getMyListings } from "@/features/listings/queries";
 import { requireOnboardedProfile } from "@/lib/auth";
+import { CLOSE_REASONS } from "@/lib/constants";
 import type { ListingStatus } from "@/lib/types/database.types";
-import { formatRent } from "@/lib/format";
+import { daysLeft, formatRent } from "@/lib/format";
 import { LISTING_BUCKET, publicImageUrl } from "@/lib/supabase/storage";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +39,24 @@ function StatusButton({ id, status, label }: { id: string; status: ListingStatus
       <input type="hidden" name="status" value={status} />
       <Button type="submit" variant="outline" size="sm">
         {label}
+      </Button>
+    </form>
+  );
+}
+
+function CloseForm({ id }: { id: string }) {
+  return (
+    <form action={closeListingAction} className="flex items-center gap-1.5">
+      <input type="hidden" name="id" value={id} />
+      <NativeSelect name="reason" defaultValue="matched" className="h-8 w-40 text-xs">
+        {CLOSE_REASONS.map((r) => (
+          <option key={r.value} value={r.value}>
+            {r.label}
+          </option>
+        ))}
+      </NativeSelect>
+      <Button type="submit" variant="outline" size="sm">
+        Kapat
       </Button>
     </form>
   );
@@ -64,6 +88,11 @@ export default async function MyListingsPage() {
         <div className="mt-6 space-y-4">
           {listings.map((listing) => {
             const cover = publicImageUrl(LISTING_BUCKET, listing.photos[0]?.storage_path);
+            const days = daysLeft(listing.expires_at);
+            const expired = days <= 0;
+            const expiringSoon = !expired && days <= 5;
+            const open = listing.status === "active" || listing.status === "passive";
+
             return (
               <div
                 key={listing.id}
@@ -71,7 +100,7 @@ export default async function MyListingsPage() {
               >
                 <Link
                   href={`/listings/${listing.id}`}
-                  className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-muted sm:w-44"
+                  className="relative aspect-4/3 w-full shrink-0 overflow-hidden rounded-xl bg-muted sm:w-44"
                 >
                   {cover && (
                     <Image src={cover} alt={listing.title} fill className="object-cover" sizes="200px" />
@@ -90,29 +119,28 @@ export default async function MyListingsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {listing.district}, {listing.city} · {formatRent(listing.monthly_rent)}/ay
                   </p>
-                  {(() => {
-                    const days = Math.ceil(
-                      (new Date(listing.expires_at).getTime() - Date.now()) / 86_400_000,
-                    );
-                    const expired = days <= 0;
-                    return (
-                      <p
-                        className={cn(
-                          "mt-1 text-xs",
-                          expired ? "text-destructive" : "text-muted-foreground",
-                        )}
-                      >
-                        {expired ? "Süresi doldu" : `${days} gün kaldı`}
-                      </p>
-                    );
-                  })()}
+                  {listing.status !== "closed" && (
+                    <p
+                      className={cn(
+                        "mt-1 text-xs",
+                        expired || expiringSoon ? "text-destructive" : "text-muted-foreground",
+                      )}
+                    >
+                      {expired ? "Süresi doldu" : `${days} gün kaldı`}
+                    </p>
+                  )}
 
-                  <div className="mt-auto flex flex-wrap gap-2 pt-3">
+                  {expiringSoon && listing.status !== "closed" && (
+                    <div className="mt-2 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      <AlarmClock className="size-4" />
+                      Süre dolmak üzere — uzatmazsan ilan otomatik pasife alınır.
+                    </div>
+                  )}
+
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+                    {open && <CloseForm id={listing.id} />}
                     {listing.status === "active" && (
-                      <>
-                        <StatusButton id={listing.id} status="passive" label="Pasife al" />
-                        <StatusButton id={listing.id} status="closed" label="Kapat" />
-                      </>
+                      <StatusButton id={listing.id} status="passive" label="Pasife al" />
                     )}
                     {listing.status === "passive" && (
                       <StatusButton id={listing.id} status="active" label="Yayına al" />
@@ -120,11 +148,11 @@ export default async function MyListingsPage() {
                     {listing.status === "closed" && (
                       <StatusButton id={listing.id} status="active" label="Yeniden yayınla" />
                     )}
-                    {listing.status !== "closed" && (
+                    {listing.status !== "closed" && (expiringSoon || expired) && (
                       <form action={extendListingAction}>
                         <input type="hidden" name="id" value={listing.id} />
-                        <Button type="submit" variant="outline" size="sm">
-                          30 gün uzat
+                        <Button type="submit" size="sm">
+                          <AlarmClock /> 30 gün uzat
                         </Button>
                       </form>
                     )}
