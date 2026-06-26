@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SwipeDeck } from "@/components/swipe-deck";
@@ -8,7 +8,7 @@ import { getDeck, likeListing, passListing, type DeckListing } from "@/lib/queri
 import { colors } from "@/lib/theme";
 
 export default function DeckScreen() {
-  const { session, signOut } = useSession();
+  const { session } = useSession();
   const [cards, setCards] = useState<DeckListing[] | null>(null);
 
   useEffect(() => {
@@ -33,22 +33,10 @@ export default function DeckScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 20,
-          paddingVertical: 12,
-        }}
-      >
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top"]}>
+      <View style={{ paddingHorizontal: 20, paddingVertical: 12 }}>
         <Text style={{ fontSize: 22, fontWeight: "800", color: colors.primary }}>hoomies</Text>
-        <Pressable onPress={signOut} hitSlop={10}>
-          <Text style={{ color: colors.muted, fontWeight: "600" }}>Çıkış</Text>
-        </Pressable>
       </View>
-
       {cards === null ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator color={colors.primary} size="large" />

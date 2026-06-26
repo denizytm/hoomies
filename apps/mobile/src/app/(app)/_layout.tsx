@@ -23,7 +23,11 @@ export default function AppLayout() {
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Protected guard={onboarded}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="chat/[id]"
+          options={{ headerShown: true, title: "Sohbet", headerTintColor: colors.text }}
+        />
       </Stack.Protected>
     </Stack>
   );

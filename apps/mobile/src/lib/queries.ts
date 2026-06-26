@@ -2,6 +2,8 @@ import { isEffectivelyBanned } from "@hoomies/shared/ban";
 import type {
   CompatibilityCategory,
   CompatibilityQuestion,
+  Profile,
+  QuestionOption,
   UserRole,
 } from "@hoomies/shared/types/database.types";
 
@@ -143,4 +145,186 @@ export async function likeListing(
     host_id: listing.owner_id,
   });
   if (error) throw error;
+}
+
+// --- Konuşmalar / sohbet ---
+
+export type ConvListItem = {
+  id: string;
+  status: string;
+  isHost: boolean;
+  otherName: string;
+  otherAvatar: string | null;
+  listingTitle: string;
+  lastMessage: string | null;
+  updatedAt: string;
+};
+
+export async function getConversations(userId: string): Promise<ConvListItem[]> {
+  const { data: convs } = await supabase
+    .from("conversations")
+    .select("*")
+    .or(`seeker_id.eq.${userId},host_id.eq.${userId}`)
+    .order("updated_at", { ascending: false });
+  if (!convs?.length) return [];
+
+  const listingIds = [...new Set(convs.map((c) => c.listing_id))];
+  const otherIds = [...new Set(convs.map((c) => (c.host_id === userId ? c.seeker_id : c.host_id)))];
+  const convIds = convs.map((c) => c.id);
+
+  const [{ data: listings }, { data: profiles }, { data: msgs }] = await Promise.all([
+    supabase.from("listings").select("id, title").in("id", listingIds),
+    supabase.from("profiles").select("id, full_name, avatar_url").in("id", otherIds),
+    supabase
+      .from("messages")
+      .select("conversation_id, body, created_at")
+      .in("conversation_id", convIds)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const lm = new Map((listings ?? []).map((l) => [l.id, l.title]));
+  const pm = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const last = new Map<string, string>();
+  for (const m of msgs ?? []) if (!last.has(m.conversation_id)) last.set(m.conversation_id, m.body);
+
+  return convs.map((c) => {
+    const otherId = c.host_id === userId ? c.seeker_id : c.host_id;
+    const other = pm.get(otherId);
+    return {
+      id: c.id,
+      status: c.status,
+      isHost: c.host_id === userId,
+      otherName: other?.full_name ?? "Kullanıcı",
+      otherAvatar: other?.avatar_url ?? null,
+      listingTitle: lm.get(c.listing_id) ?? "İlan",
+      lastMessage: last.get(c.id) ?? null,
+      updatedAt: c.updated_at,
+    };
+  });
+}
+
+export type ChatMessage = { id: string; sender_id: string; body: string };
+
+export type ChatDetail = {
+  status: string;
+  isHost: boolean;
+  otherName: string;
+  listingId: string | null;
+  listingStatus: string | null;
+  listingTitle: string | null;
+  district: string | null;
+  messages: ChatMessage[];
+  otherScore: number | null;
+  otherAnswers: { question: string; answer: string }[];
+};
+
+export async function getConversationDetail(
+  id: string,
+  userId: string,
+): Promise<ChatDetail | null> {
+  const { data: conv } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (!conv) return null;
+
+  const isHost = conv.host_id === userId;
+  const otherId = isHost ? conv.seeker_id : conv.host_id;
+
+  const [{ data: listing }, { data: other }, { data: messages }, { data: rawAnswers }] =
+    await Promise.all([
+      supabase
+        .from("listings")
+        .select("id, title, district, status")
+        .eq("id", conv.listing_id)
+        .maybeSingle(),
+      supabase.from("profiles").select("id, full_name").eq("id", otherId).maybeSingle(),
+      supabase
+        .from("messages")
+        .select("id, sender_id, body, created_at")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true }),
+      supabase.rpc("conversation_other_answers", { conv_id: id }),
+    ]);
+
+  let otherScore: number | null = null;
+  let otherAnswers: { question: string; answer: string }[] = [];
+  if (rawAnswers && rawAnswers.length > 0) {
+    const [{ data: scores }, { data: questions }] = await Promise.all([
+      supabase.rpc("compatibility_scores", { other_users: [otherId] }),
+      supabase.from("compatibility_questions").select("*").order("position"),
+    ]);
+    otherScore = scores?.[0]?.score ?? null;
+    const vMap = new Map(rawAnswers.map((a) => [a.question_id, a.value]));
+    otherAnswers = (questions ?? [])
+      .filter((q) => vMap.has(q.id))
+      .map((q) => {
+        const opts = q.options as unknown as QuestionOption[];
+        const v = vMap.get(q.id);
+        return { question: q.question, answer: opts.find((o) => o.value === v)?.label ?? String(v) };
+      });
+  }
+
+  return {
+    status: conv.status,
+    isHost,
+    otherName: other?.full_name ?? "Kullanıcı",
+    listingId: listing?.id ?? null,
+    listingStatus: listing?.status ?? null,
+    listingTitle: listing?.title ?? null,
+    district: listing?.district ?? null,
+    messages: (messages ?? []).map((m) => ({ id: m.id, sender_id: m.sender_id, body: m.body })),
+    otherScore,
+    otherAnswers,
+  };
+}
+
+export async function sendMessage(convId: string, senderId: string, body: string): Promise<void> {
+  const { error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: convId, sender_id: senderId, body });
+  if (error) throw error;
+}
+
+export async function setConversationStatus(
+  id: string,
+  status: "accepted" | "declined",
+  userId: string,
+): Promise<void> {
+  await supabase.from("conversations").update({ status }).eq("id", id).eq("host_id", userId);
+}
+
+export async function closeListing(
+  listingId: string,
+  userId: string,
+  reason = "matched",
+): Promise<void> {
+  await supabase
+    .from("listings")
+    .update({ status: "closed", close_reason: reason })
+    .eq("id", listingId)
+    .eq("owner_id", userId);
+}
+
+// --- Profil ---
+
+export async function getProfileFull(
+  userId: string,
+): Promise<{ profile: Profile | null; university: string | null }> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+  let university: string | null = null;
+  if (profile?.university_id) {
+    const { data: u } = await supabase
+      .from("universities")
+      .select("name")
+      .eq("id", profile.university_id)
+      .maybeSingle();
+    university = u?.name ?? null;
+  }
+  return { profile: profile ?? null, university };
 }
