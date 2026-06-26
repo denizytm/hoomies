@@ -32,6 +32,10 @@ export default function AppLayout() {
           name="listing-new"
           options={{ headerShown: true, title: "Yeni ilan", headerTintColor: colors.text }}
         />
+        <Stack.Screen
+          name="compat-edit"
+          options={{ headerShown: true, title: "Uyum soruları", headerTintColor: colors.text }}
+        />
       </Stack.Protected>
     </Stack>
   );

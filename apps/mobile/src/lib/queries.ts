@@ -23,9 +23,19 @@ export async function getOnboardingData(): Promise<{
   return { categories: categories ?? [], questions: questions ?? [] };
 }
 
-export async function saveOnboarding(
+export async function getMyAnswers(userId: string): Promise<Record<number, number>> {
+  const { data } = await supabase
+    .from("compatibility_answers")
+    .select("question_id, value")
+    .eq("user_id", userId);
+  const map: Record<number, number> = {};
+  for (const a of data ?? []) map[a.question_id] = a.value;
+  return map;
+}
+
+// Sadece cevapları kaydet (profilden güncelleme — onboarding bayrağına dokunmaz).
+export async function saveAnswers(
   userId: string,
-  role: UserRole,
   answers: Record<number, number>,
 ): Promise<void> {
   const rows = Object.entries(answers).map(([qid, value]) => ({
@@ -33,15 +43,25 @@ export async function saveOnboarding(
     question_id: Number(qid),
     value,
   }));
-  const { error: e1 } = await supabase
+  if (rows.length === 0) return;
+  const { error } = await supabase
     .from("compatibility_answers")
     .upsert(rows, { onConflict: "user_id,question_id" });
-  if (e1) throw e1;
-  const { error: e2 } = await supabase
+  if (error) throw error;
+}
+
+// Onboarding'i tamamla — cevaplar kısmi/boş olabilir, bayrak yine de set edilir.
+export async function saveOnboarding(
+  userId: string,
+  role: UserRole,
+  answers: Record<number, number>,
+): Promise<void> {
+  await saveAnswers(userId, answers);
+  const { error } = await supabase
     .from("profiles")
     .update({ role, onboarding_completed: true })
     .eq("id", userId);
-  if (e2) throw e2;
+  if (error) throw error;
 }
 
 export type DeckListing = {

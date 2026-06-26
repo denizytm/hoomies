@@ -1,18 +1,18 @@
 import type {
   CompatibilityCategory,
   CompatibilityQuestion,
-  UserRole,
 } from "@hoomies/shared/types/database.types";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { CompatQuestionnaire } from "@/components/compat-questionnaire";
 import { useSession } from "@/lib/auth-context";
-import { getMyAnswers, getOnboardingData, saveOnboarding } from "@/lib/queries";
+import { getMyAnswers, getOnboardingData, saveAnswers } from "@/lib/queries";
 import { colors } from "@/lib/theme";
 
-export default function Onboarding() {
-  const { session, profile, refreshProfile } = useSession();
+export default function CompatEdit() {
+  const { session } = useSession();
   const [data, setData] = useState<{
     categories: CompatibilityCategory[];
     questions: CompatibilityQuestion[];
@@ -39,12 +39,12 @@ export default function Onboarding() {
       categories={data.categories}
       questions={data.questions}
       initial={data.initial}
-      submitLabel="Tamamla"
-      warnIncomplete
+      submitLabel="Kaydet"
+      warnIncomplete={false}
       onSubmit={async (answers) => {
         if (!session) return;
-        await saveOnboarding(session.user.id, (profile?.role as UserRole) ?? "seeker", answers);
-        await refreshProfile();
+        await saveAnswers(session.user.id, answers);
+        router.back();
       }}
     />
   );
