@@ -1,25 +1,61 @@
-import { Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Btn } from "@/components/form";
+import { SwipeDeck } from "@/components/swipe-deck";
 import { useSession } from "@/lib/auth-context";
+import { getDeck, likeListing, passListing, type DeckListing } from "@/lib/queries";
 import { colors } from "@/lib/theme";
 
-export default function Home() {
+export default function DeckScreen() {
   const { session, signOut } = useSession();
+  const [cards, setCards] = useState<DeckListing[] | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    getDeck(session.user.id)
+      .then(setCards)
+      .catch(() => setCards([]));
+  }, [session?.user.id]);
+
+  const onLike = useCallback(
+    (card: DeckListing) => {
+      if (session) void likeListing(session.user.id, card).catch(() => {});
+    },
+    [session],
+  );
+
+  const onPass = useCallback(
+    (card: DeckListing) => {
+      if (session) void passListing(session.user.id, card.id).catch(() => {});
+    },
+    [session],
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ flex: 1, padding: 24, gap: 14, justifyContent: "center" }}>
-        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>Hoş geldin 👋</Text>
-        <Text style={{ color: colors.muted }}>{session?.user.email}</Text>
-        <Text style={{ color: colors.muted, lineHeight: 22 }}>
-          Giriş çalışıyor. Sıradaki adımda kaydırmalı (swipe) ilan eşleşmesi, onboarding ve
-          mesajlaşma ekranları gelecek.
-        </Text>
-        <View style={{ height: 8 }} />
-        <Btn title="Çıkış yap" onPress={signOut} variant="outline" />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+        }}
+      >
+        <Text style={{ fontSize: 22, fontWeight: "800", color: colors.primary }}>hoomies</Text>
+        <Pressable onPress={signOut} hitSlop={10}>
+          <Text style={{ color: colors.muted, fontWeight: "600" }}>Çıkış</Text>
+        </Pressable>
       </View>
+
+      {cards === null ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : (
+        <SwipeDeck cards={cards} onLike={onLike} onPass={onPass} />
+      )}
     </SafeAreaView>
   );
 }

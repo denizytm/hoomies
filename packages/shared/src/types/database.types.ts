@@ -282,6 +282,12 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["banned_emails"]["Insert"]>;
         Relationships: [];
       };
+      listing_passes: {
+        Row: { user_id: string; listing_id: string; created_at: string };
+        Insert: { user_id: string; listing_id: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["listing_passes"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
