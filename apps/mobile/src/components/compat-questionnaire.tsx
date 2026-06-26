@@ -6,6 +6,7 @@ import type {
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, { SlideInLeft, SlideInRight } from "react-native-reanimated";
 
 import { Btn } from "@/components/form";
 import { colors } from "@/lib/theme";
@@ -26,8 +27,14 @@ export function CompatQuestionnaire({
   onSubmit: (answers: Record<number, number>) => Promise<void>;
 }) {
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [answers, setAnswers] = useState<Record<number, number>>(initial);
   const [saving, setSaving] = useState(false);
+
+  function goBack() {
+    setDirection("back");
+    setStep((s) => Math.max(0, s - 1));
+  }
 
   const cat = categories[step];
   const stepQuestions = questions.filter((q) => q.category_id === cat?.id);
@@ -47,6 +54,7 @@ export function CompatQuestionnaire({
 
   function onNext() {
     if (!isLast) {
+      setDirection("forward");
       setStep((s) => s + 1);
       return;
     }
@@ -88,8 +96,13 @@ export function CompatQuestionnaire({
           İstersen boş bırak — sonra Profil'den güncelleyebilirsin.
         </Text>
 
-        {stepQuestions.map((q) => {
-          const opts = q.options as unknown as QuestionOption[];
+        <Animated.View
+          key={step}
+          entering={(direction === "back" ? SlideInLeft : SlideInRight).duration(220)}
+          style={{ gap: 14 }}
+        >
+          {stepQuestions.map((q) => {
+            const opts = q.options as unknown as QuestionOption[];
           return (
             <View
               key={q.id}
@@ -129,7 +142,8 @@ export function CompatQuestionnaire({
               </View>
             </View>
           );
-        })}
+          })}
+        </Animated.View>
       </ScrollView>
 
       {/* Alt: Geri / İleri / Bitir */}
@@ -143,7 +157,7 @@ export function CompatQuestionnaire({
         }}
       >
         <View style={{ flex: 1 }}>
-          <Btn title="Geri" variant="outline" onPress={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || saving} />
+          <Btn title="Geri" variant="outline" onPress={goBack} disabled={step === 0 || saving} />
         </View>
         <View style={{ flex: 1 }}>
           <Btn title={isLast ? submitLabel : "İleri"} onPress={onNext} loading={saving} />
