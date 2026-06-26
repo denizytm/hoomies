@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -37,14 +38,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<MiniProfile>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const loadToken = useRef(0);
 
   async function loadProfile(userId: string) {
+    const token = ++loadToken.current;
     const { data } = await supabase
       .from("profiles")
       .select("id, full_name, role, onboarding_completed")
       .eq("id", userId)
       .maybeSingle();
-    setProfile(data);
+    // Yalnızca en son istek uygulanır (demo reset yarışını önler).
+    if (token === loadToken.current) setProfile(data);
   }
 
   useEffect(() => {
@@ -64,7 +68,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function refreshProfile() {
-    if (session) await loadProfile(session.user.id);
+    // Güncel oturumu oku (stale closure'a düşme).
+    const { data } = await supabase.auth.getSession();
+    if (data.session) await loadProfile(data.session.user.id);
   }
 
   async function signOut() {
